@@ -35,14 +35,12 @@
  *-------------------------------------------------------------
  */
 
-module user_proj_example #(
-    parameter BITS = 32
-)(
+module user_proj_example (
 `ifdef USE_POWER_PINS
     inout vccd1,	// User area 1 1.8V supply
     inout vssd1,	// User area 1 digital ground
 `endif
-
+    input user_clock2,
     // Wishbone Slave ports (WB MI A)
     input wb_clk_i,
     input wb_rst_i,
@@ -68,98 +66,73 @@ module user_proj_example #(
     // IRQ
     output [2:0] irq
 );
-    wire clk;
-    wire rst;
+    wire [239:0] o_const, const_zero;
+    wire [364:0] buf_i, buf_i_q;
+    wire clk, user_clk2, rst;
 
-    wire [`MPRJ_IO_PADS-1:0] io_in;
-    wire [`MPRJ_IO_PADS-1:0] io_out;
-    wire [`MPRJ_IO_PADS-1:0] io_oeb;
-
-    wire [31:0] rdata; 
-    wire [31:0] wdata;
-    wire [BITS-1:0] count;
-
-    wire valid;
-    wire [3:0] wstrb;
-    wire [31:0] la_write;
-
-    // WB MI A
-    assign valid = wbs_cyc_i && wbs_stb_i; 
-    assign wstrb = wbs_sel_i & {4{wbs_we_i}};
-    assign wbs_dat_o = rdata;
-    assign wdata = wbs_dat_i;
-
-    // IO
-    assign io_out = count;
-    assign io_oeb = {(`MPRJ_IO_PADS-1){rst}};
-
-    // IRQ
-    assign irq = 3'b000;	// Unused
-
-    // LA
-    assign la_data_out = {{(127-BITS){1'b0}}, count};
-    // Assuming LA probes [63:32] are for controlling the count register  
-    assign la_write = ~la_oenb[63:32] & ~{BITS{valid}};
-    // Assuming LA probes [65:64] are for controlling the count clk & reset  
-    assign clk = (~la_oenb[64]) ? la_data_in[64]: wb_clk_i;
-    assign rst = (~la_oenb[65]) ? la_data_in[65]: wb_rst_i;
-
-    counter #(
-        .BITS(BITS)
-    ) counter(
-        .clk(clk),
-        .reset(rst),
-        .ready(wbs_ack_o),
-        .valid(valid),
-        .rdata(rdata),
-        .wdata(wbs_dat_i),
-        .wstrb(wstrb),
-        .la_write(la_write),
-        .la_input(la_data_in[63:32]),
-        .count(count)
+    // For an input, assume the load is that of a high drive strength buffer
+    sky130_fd_sc_hd__clkbuf_16 CLK_BUF[1:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .A({wb_clk_i,user_clock2}), 
+        .X({clk,user_clk2})
     );
 
-endmodule
+    sky130_fd_sc_hd__buf_16 i_BUF[365:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .A({wb_rst_i, wbs_cyc_i, wbs_stb_i, wbs_we_i, wbs_sel_i, io_in, la_data_in, la_oenb, wbs_adr_i, wbs_dat_i}), 
+        .X({rst, buf_i})
+    );
 
-module counter #(
-    parameter BITS = 32
-)(
-    input clk,
-    input reset,
-    input valid,
-    input [3:0] wstrb,
-    input [BITS-1:0] wdata,
-    input [BITS-1:0] la_write,
-    input [BITS-1:0] la_input,
-    output ready,
-    output [BITS-1:0] rdata,
-    output [BITS-1:0] count
-);
-    reg ready;
-    reg [BITS-1:0] count;
-    reg [BITS-1:0] rdata;
+    // input transition
+    sky130_fd_sc_hd__dfrtp_1 i_FF[364:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .CLK(clk),
+        .D(buf_i),
+        .Q(buf_i_q),
+        .RESET_B(rst)
+    );
 
-    always @(posedge clk) begin
-        if (reset) begin
-            count <= 0;
-            ready <= 0;
-        end else begin
-            ready <= 1'b0;
-            if (~|la_write) begin
-                count <= count + 1;
-            end
-            if (valid && !ready) begin
-                ready <= 1'b1;
-                rdata <= count;
-                if (wstrb[0]) count[7:0]   <= wdata[7:0];
-                if (wstrb[1]) count[15:8]  <= wdata[15:8];
-                if (wstrb[2]) count[23:16] <= wdata[23:16];
-                if (wstrb[3]) count[31:24] <= wdata[31:24];
-            end else if (|la_write) begin
-                count <= la_write & la_input;
-            end
-        end
-    end
+    // For an output, assume the drive capability is that of a low drive strength buffer 
+    sky130_fd_sc_hd__buf_2 o_BUF[239:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .A({o_const}), 
+        .X({wbs_ack_o, io_oeb, io_out, irq, la_data_out, wbs_dat_o})
+    );
 
+    // output transition
+    assign const_zero=240'b0;
+
+    sky130_fd_sc_hd__dfrtp_1 o_FF[239:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .CLK(clk),
+        .D(const_zero),
+        .Q(o_const),
+        .RESET_B(rst)
+    );
 endmodule
 `default_nettype wire

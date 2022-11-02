@@ -90,6 +90,7 @@ user_proj_example mprj (
 
     .wb_clk_i(wb_clk_i),
     .wb_rst_i(wb_rst_i),
+    .user_clock2(user_clock2),
 
     // MGMT SoC Wishbone Slave
 

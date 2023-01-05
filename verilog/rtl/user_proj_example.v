@@ -107,6 +107,21 @@ module user_proj_example (
         .RESET_B(rst)
     );
 
+    wire user_clk2_test, user_clk2_test_q;
+    assign user_clk2_test = wbs_we_i;
+    sky130_fd_sc_hd__dfrtp_1 user_clk2_FF (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .CLK(user_clk2),
+        .D(user_clk2_test),
+        .Q(user_clk2_test_q),
+        .RESET_B(rst)
+    );
+
     // For an output, assume the drive capability is that of a low drive strength buffer 
     sky130_fd_sc_hd__buf_2 o_BUF[239:0] (
         `ifdef USE_POWER_PINS

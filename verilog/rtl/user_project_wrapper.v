@@ -82,7 +82,8 @@ module user_project_wrapper #(
 /* User project is instantiated  here   */
 /*--------------------------------------*/
 
-user_proj_example mprj (
+// user_proj_example mprj (
+SPM_example mprj (
 `ifdef USE_POWER_PINS
 	.vccd1(vccd1),	// User area 1 1.8V power
 	.vssd1(vssd1),	// User area 1 digital ground
@@ -90,7 +91,6 @@ user_proj_example mprj (
 
     .wb_clk_i(wb_clk_i),
     .wb_rst_i(wb_rst_i),
-    .user_clock2(user_clock2),
 
     // MGMT SoC Wishbone Slave
 

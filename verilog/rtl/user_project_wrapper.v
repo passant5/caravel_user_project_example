@@ -81,43 +81,92 @@ module user_project_wrapper #(
 /*--------------------------------------*/
 /* User project is instantiated  here   */
 /*--------------------------------------*/
+    wire [239:0] o_const, const_zero;
+    wire [364:0] buf_i, buf_i_q;
+    wire clk, user_clk2, rst;
 
-// user_proj_example mprj (
-SPM_example mprj (
-`ifdef USE_POWER_PINS
-	.vccd1(vccd1),	// User area 1 1.8V power
-	.vssd1(vssd1),	// User area 1 digital ground
-`endif
+    // For an input, assume the load is that of a high drive strength buffer
+// (* keep *)    sky130_fd_sc_hd__clkbuf_16 CLK_BUF[1:0] (
+//         `ifdef USE_POWER_PINS
+// 			.VGND(vssd1),
+// 			.VNB(vssd1),
+// 			.VPB(vccd1),
+// 			.VPWR(vccd1),
+// 		`endif
+//         .A({wb_clk_i,user_clock2}), 
+//         .X({clk,user_clk2})
+//     );
+    assign {clk,user_clk2} = {wb_clk_i,user_clock2};
+    assign {rst, buf_i} = {wb_rst_i, wbs_cyc_i, wbs_stb_i, wbs_we_i, wbs_sel_i, io_in, la_data_in, la_oenb, wbs_adr_i, wbs_dat_i};
+// (* keep *)    sky130_fd_sc_hd__buf_16 i_BUF[365:0] (
+//         `ifdef USE_POWER_PINS
+// 			.VGND(vssd1),
+// 			.VNB(vssd1),
+// 			.VPB(vccd1),
+// 			.VPWR(vccd1),
+// 		`endif
+//         .A({wb_rst_i, wbs_cyc_i, wbs_stb_i, wbs_we_i, wbs_sel_i, io_in, la_data_in, la_oenb, wbs_adr_i, wbs_dat_i}), 
+//         .X({rst, buf_i})
+//     );
 
-    .wb_clk_i(wb_clk_i),
-    .wb_rst_i(wb_rst_i),
+    // input transition
+(* keep *)    sky130_fd_sc_hd__dfrtp_1 i_FF[364:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .CLK(clk),
+        .D(buf_i),
+        .Q(buf_i_q),
+        .RESET_B(rst)
+    );
 
-    // MGMT SoC Wishbone Slave
+    wire user_clk2_test, user_clk2_test_q;
+    assign user_clk2_test = wbs_we_i;
+(* keep *)    sky130_fd_sc_hd__dfrtp_1 user_clk2_FF (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .CLK(user_clk2),
+        .D(user_clk2_test),
+        .Q(user_clk2_test_q),
+        .RESET_B(rst)
+    );
 
-    .wbs_cyc_i(wbs_cyc_i),
-    .wbs_stb_i(wbs_stb_i),
-    .wbs_we_i(wbs_we_i),
-    .wbs_sel_i(wbs_sel_i),
-    .wbs_adr_i(wbs_adr_i),
-    .wbs_dat_i(wbs_dat_i),
-    .wbs_ack_o(wbs_ack_o),
-    .wbs_dat_o(wbs_dat_o),
+    // For an output, assume the drive capability is that of a low drive strength buffer 
+// (* keep *)    sky130_fd_sc_hd__buf_2 o_BUF[239:0] (
+//         `ifdef USE_POWER_PINS
+// 			.VGND(vssd1),
+// 			.VNB(vssd1),
+// 			.VPB(vccd1),
+// 			.VPWR(vccd1),
+// 		`endif
+//         .A({o_const}), 
+//         .X({wbs_ack_o, io_oeb, io_out, user_irq, la_data_out, wbs_dat_o})
+//     );
 
-    // Logic Analyzer
+    // output transition
+    assign const_zero=240'b0;
 
-    .la_data_in(la_data_in),
-    .la_data_out(la_data_out),
-    .la_oenb (la_oenb),
+(* keep *)    sky130_fd_sc_hd__dfrtp_1 o_FF[239:0] (
+        `ifdef USE_POWER_PINS
+			.VGND(vssd1),
+			.VNB(vssd1),
+			.VPB(vccd1),
+			.VPWR(vccd1),
+		`endif
+        .CLK(clk),
+        .D(const_zero),
+        .Q(o_const),
+        .RESET_B(rst)
+    );
 
-    // IO Pads
-
-    .io_in (io_in),
-    .io_out(io_out),
-    .io_oeb(io_oeb),
-
-    // IRQ
-    .irq(user_irq)
-);
+    assign {wbs_ack_o, io_oeb, io_out, user_irq, la_data_out, wbs_dat_o} = o_const;
 
 endmodule	// user_project_wrapper
 
